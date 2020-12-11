@@ -3,6 +3,10 @@ package main
 import (
 "fmt"
 "syscall"
+"mime/quotedprintable"
+"ioutil"
+"strings"
+"binary"
 )
 const (
 HOSTNAME = "hostname"
@@ -15,31 +19,50 @@ TIMEOUT  = 60
 )
 
 
-func make_avp(attr_type int,avp_mbit string,avp_hbit string,avp_len int,avp_vid int,avp_raw_data string,kwargs map[string]interface{}) string {
+func make_avp(attr_type int,avp_len int,avp_vid int,avp_raw_data string,kwargs map[string]interface{}) string {
 
-        avp_flag = int(avp_mbit+avp_hbit+'000000',2)
-        avp_data = struct.pack('!BBH', avp_flag, avp_len, avp_vid)
+        avp_flag :=128
+
+        avp_data := struct.pack('!BBH', avp_flag, avp_len, avp_vid)
         avp_data += struct.pack('!H', attr_type)
-        for key in sorted(kwargs.iterkeys()):
+        for _,item :=range kwargs:
             avp_data += struct.pack('!H',kwargs[key])
         if avp_raw_data != '':
             avp_data += avp_raw_data
         return avp_data
 }
-func make_header() string {
+func make_header(ptype string,blen string,sbit string,obit string,pbit string,ver string,plen int) string {
+}
+func a2b_qp(s string) string {
+b, _ := ioutil.ReadAll(quotedprintable.NewReader(strings.NewReader(s)))
+return b
 }
 func make_sccrq() string {
+        kwargs:=make(map[string]int)
 
         avp_data :=""
-        avp_data += make_avp(0,"1","0",8,0,"", attr_value=1)
-        avp_data += make_avp(2,"1","0",8,0,"", attr_value=256)
-        avp_data += make_avp(3, "1","0",10,0,"", attr_value1=0, attr_value2=3)
-        avp_data += make_avp(4, "1","0",10,0,"", attr_value1=0, attr_value2=0)
-        avp_data += make_avp(6, "1","0",10,0,"", attr_value=1680)
-        avp_data += make_avp(7, "1","0",6+len(HOSTNAME),0,"", avp_raw_data=binascii.a2b_qp(HOSTNAME))
-        avp_data += make_avp(8, "1","0",6+len(VENDOR),0,"", avp_raw_data=binascii.a2b_qp(VENDOR))
-        avp_data += make_avp(9, "1","0",10,0,"", attr_value=64773)
-        avp_data += make_avp(10, "1","0",10,0,"", attr_value=4)
+        kwargs["attr_value"] = 1
+        avp_data += make_avp(0,8,0,"", kwargs)
+        kwargs["attr_value"] = 256
+        avp_data += make_avp(2,8,0,"", attr_value=256)
+        kwargs["attr_value"]=0
+        kwargs["attr_value1"]=3
+        avp_data += make_avp(3, 10,0,"", kwargs)
+        kwargs["attr_value"]=0
+        kwargs["attr_value1"] = 0
+        avp_data += make_avp(4,10,0,"", kwargs)
+        delete(kwargs,"attr_value1")
+        kwargs["attr_value"]=1680
+        avp_data += make_avp(6, 10,0,"", kwargs)
+        delete(kwargs,"attr_value1")
+        avp_raw_data := quotedprintable(HOSTNAME)
+        avp_data += make_avp(7, 6+len(HOSTNAME),0,avp_raw_data,kwargs)
+        avp_raw_data = quotedprintable(VENDOR)
+        avp_data += make_avp(8, 6+len(VENDOR),0, avp_raw_data,kwargs)
+        kwargs["attr_value"]=64773
+        avp_data += make_avp(9, 10,0,"", kwargs)
+        kwargs["attr_value"]=4
+        avp_data += make_avp(10, 10,0,"", kwargs)
         header_data := make_header(plen=12+87)
         l2tp_data = header_data + avp_data
         return l2tp_data
